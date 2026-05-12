@@ -9,5 +9,4 @@ ALTURA = 414
 FPS = 60
 TITULO = "Time out"
 
-IP_SERVIDOR = "82.38.173.25"
 PORTA = 5555

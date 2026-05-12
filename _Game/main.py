@@ -231,7 +231,15 @@ if __name__ == "__main__":
     from rede.cliente import Cliente
     from rede.servidor import Servidor
 
-    escolha, ip_guest = tela_menu()
+    # Suporte a argumentos de linha de comando (evita menu para uso via terminal)
+    if "--host" in sys.argv:
+        escolha, ip_guest = "host", None
+    elif "--join" in sys.argv:
+        idx = sys.argv.index("--join")
+        ip_arg = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
+        escolha, ip_guest = ("guest", ip_arg) if ip_arg else tela_menu()
+    else:
+        escolha, ip_guest = tela_menu()
 
     if escolha == "host":
         srv = Servidor()
