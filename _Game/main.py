@@ -1,11 +1,13 @@
 """
 Cliente do jogo Time Out — Multiplayer em Rede
-Rodar: python main.py --join <ip>
-       python main.py          (pede o IP na tela)
+Rodar: python main.py
+  [H] Hospedar — inicia servidor interno e entra como J1
+  [E] Entrar   — conecta no IP do host
 """
 import pygame
 import sys
 import socket
+import threading
 import time
 from configuracoes import LARGURA, ALTURA, FPS, TITULO, DIR_SONS, PORTA
 from PIL import Image, ImageDraw
@@ -56,7 +58,6 @@ def tela_info(linha1, linha2=""):
 
 
 def tela_digitar_ip():
-    """Tela para digitar IP do servidor quando nenhum argumento é passado."""
     ip = ""
     label = render_texto("IP do servidor:", (200, 220, 255), 4)
     while True:
@@ -76,9 +77,49 @@ def tela_digitar_ip():
         tela.blit(label, (LARGURA // 2 - label.get_width() // 2, ALTURA // 2 - 60))
         cursor = render_texto(ip or "_", (255, 255, 100), 4)
         tela.blit(cursor, (LARGURA // 2 - cursor.get_width() // 2, ALTURA // 2))
-        dica = render_texto("Enter para conectar", (100, 100, 150), 2)
+        dica = render_texto("Enter para conectar  |  ESC voltar", (100, 100, 150), 2)
         tela.blit(dica, (LARGURA // 2 - dica.get_width() // 2, ALTURA // 2 + 60))
         pygame.display.update()
+
+
+def tela_menu():
+    """Retorna ('host', None) ou ('guest', <ip>)."""
+    titulo   = render_texto("TIME OUT", (220, 100, 50), 6)
+    opt_h    = render_texto("[H]  Hospedar partida", (100, 220, 100), 3)
+    opt_e    = render_texto("[E]  Entrar na partida", (100, 180, 255), 3)
+    opt_esc  = render_texto("[ESC]  Sair", (130, 130, 130), 3)
+    while True:
+        relogio.tick(30)
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_h:
+                    return ("host", None)
+                elif ev.key == pygame.K_e:
+                    ip = tela_digitar_ip()
+                    return ("guest", ip)
+                elif ev.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+        tela.fill((20, 20, 40))
+        tela.blit(titulo, (LARGURA // 2 - titulo.get_width() // 2, 55))
+        tela.blit(opt_h,   (LARGURA // 2 - opt_h.get_width() // 2, 180))
+        tela.blit(opt_e,   (LARGURA // 2 - opt_e.get_width() // 2, 240))
+        tela.blit(opt_esc, (LARGURA // 2 - opt_esc.get_width() // 2, 320))
+        pygame.display.update()
+
+
+def obter_ip_local():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 def desenhar_fim_de_jogo():
@@ -140,7 +181,7 @@ def loop_rede(cliente):
 
         estado = cliente.estado_atual
         if estado is None:
-            tela_info("Aguardando partida...", "Conectado! Esperando 2o jogador")
+            tela_info("Aguardando 2o jogador...", f"IP: {obter_ip_local()}  Porta: {PORTA}")
             continue
 
         grupo_fundo.draw(tela)
@@ -188,27 +229,32 @@ def loop_rede(cliente):
 
 if __name__ == "__main__":
     from rede.cliente import Cliente
+    from rede.servidor import Servidor
 
-    # IP via argumento ou tela de digitação
-    if "--join" in sys.argv:
-        idx = sys.argv.index("--join")
-        ip = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
-        if not ip:
-            ip = tela_digitar_ip()
+    escolha, ip_guest = tela_menu()
+
+    if escolha == "host":
+        srv = Servidor()
+        threading.Thread(target=srv.iniciar, daemon=True).start()
+        ip_conectar = "127.0.0.1"
+        tela_info("Aguardando 2o jogador...", f"Seu IP: {obter_ip_local()}  Porta: {PORTA}")
     else:
-        ip = tela_digitar_ip()
+        ip_conectar = ip_guest
 
-    tela_info("Conectando...", ip)
     cli = Cliente()
-    try:
-        cli.conectar(ip, PORTA)
-    except OSError as e:
-        tela_info("Erro ao conectar", str(e))
+    tela_info("Conectando...", ip_conectar)
+    for _ in range(20):
+        try:
+            cli.conectar(ip_conectar, PORTA)
+            break
+        except OSError:
+            time.sleep(0.3)
+    else:
+        tela_info("Erro ao conectar", ip_conectar)
         time.sleep(3)
         pygame.quit()
         sys.exit()
 
-    # Aguarda player_id do servidor
     for _ in range(50):
         if cli.player_id is not None:
             break
