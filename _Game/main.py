@@ -9,6 +9,7 @@ import sys
 import socket
 import threading
 import time
+import Pyro5.errors
 from configuracoes import LARGURA, ALTURA, FPS, TITULO, DIR_SONS, PORTA
 from PIL import Image, ImageDraw
 from sprites.fundo import Fundo
