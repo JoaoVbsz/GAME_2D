@@ -173,7 +173,7 @@ class ServidorJogo:
         for p in self.proj_j1:
             p["x"] += VEL_PROJ
         for p in self.proj_j2:
-            p["x"] -= VEL_PROJ
+            p["x"] += VEL_PROJ
         self.proj_j1 = [p for p in self.proj_j1 if 0 <= p["x"] <= LARGURA]
         self.proj_j2 = [p for p in self.proj_j2 if 0 <= p["x"] <= LARGURA]
 
