@@ -10,14 +10,6 @@ Jogo multiplayer local/rede em Python com Pygame. Dois jogadores (mago de chão 
 ```bash
 pip install pygame pillow
 ```
-
-## Como rodar
-
-```bash
-cd _Game
-python main.py
-```
-
 ---
 
 ## Conectar na partida
