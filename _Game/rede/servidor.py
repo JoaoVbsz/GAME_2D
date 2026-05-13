@@ -77,6 +77,9 @@ class ServidorJogo:
 
     def _game_loop(self):
         self._rodando = True
+        with self._lock:
+            proxies = {pid: Pyro5.api.Proxy(uri)
+                       for pid, uri in self._uris_clientes.items()}
         dt = 1.0 / TICK_RATE
         while self._rodando:
             t0 = time.time()
@@ -84,11 +87,12 @@ class ServidorJogo:
                 if not self.fim_jogo:
                     self._tick()
                 estado = self._serializar()
-            for proxy in list(self._clientes.values()):
+            for proxy in proxies.values():
                 try:
                     proxy.receber_estado(estado)
                 except Exception:
-                    pass
+                    self._rodando = False
+                    break
             time.sleep(max(0.0, dt - (time.time() - t0)))
 
     def _tick(self):
