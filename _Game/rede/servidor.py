@@ -1,6 +1,6 @@
-import socket
+import Pyro5.api
+import Pyro5.server
 import threading
-import json
 import time
 import math
 import random
@@ -20,20 +20,16 @@ TAM_J = 100
 TAM_VOA = 80
 
 
-class Servidor:
-    def __init__(self, host="0.0.0.0", porta=PORTA):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((host, porta))
-        self.sock.listen(3)
-        self.lock = threading.Lock()
+@Pyro5.api.expose
+class ServidorJogo:
+    def __init__(self):
+        self._clientes = {}
+        self._lock = threading.Lock()
         self._rodando = False
-        self.clientes = {}
-        self.buffers = {}
+        self._n_conectados = 0
         self.teclas = {0: set(), 1: set()}
         self.teclas_prev = {0: set(), 1: set()}
         self._reset()
-        print(f"[*] Servidor em {host}:{porta}")
 
     def _reset(self):
         chao = float(ALTURA - TAM_J)
@@ -56,70 +52,46 @@ class Servidor:
         self._nid += 1
         return self._nid
 
-    def iniciar(self):
-        print("[*] Aguardando 2 jogadores...")
-        conns = []
-        while len(conns) < 2:
-            conn, addr = self.sock.accept()
-            pid = len(conns)
-            conns.append((conn, pid))
-            with self.lock:
-                self.clientes[pid] = conn
-                self.buffers[pid] = ""
-            conn.sendall((json.dumps({"tipo": "init", "player_id": pid}) + "\n").encode())
-            print(f"[+] J{pid} conectado: {addr}")
+    def conectar(self, uri_cliente: str) -> int:
+        with self._lock:
+            pid = self._n_conectados
+            self._clientes[pid] = Pyro5.api.Proxy(uri_cliente)
+            self._n_conectados += 1
+            n = self._n_conectados
+        print(f"[+] J{pid} conectado via RMI: {uri_cliente}")
+        if n == 2:
+            threading.Thread(target=self._game_loop, daemon=True).start()
+        return pid
 
-        self._rodando = True
-        threading.Thread(target=self._rejeitar_extras, daemon=True).start()
-        for conn, pid in conns:
-            threading.Thread(target=self._leitura, args=(conn, pid), daemon=True).start()
+    def processar_input(self, player_id: int, teclas: list):
+        with self._lock:
+            self.teclas[player_id] = set(teclas)
 
-        self._game_loop()
-
-    def _rejeitar_extras(self):
-        while self._rodando:
+    def desconectar(self, player_id: int):
+        with self._lock:
+            self.fim_jogo = True
+            proxy = self._clientes.pop(player_id, None)
+        if proxy:
             try:
-                self.sock.settimeout(1.0)
-                conn, _ = self.sock.accept()
-                conn.sendall((json.dumps({"tipo": "erro", "msg": "Partida cheia"}) + "\n").encode())
-                conn.close()
-            except OSError:
+                proxy._pyroRelease()
+            except Exception:
                 pass
-
-    def _leitura(self, conn, pid):
-        try:
-            while self._rodando:
-                data = conn.recv(4096).decode("utf-8", errors="ignore")
-                if not data:
-                    break
-                with self.lock:
-                    self.buffers[pid] += data
-                    while "\n" in self.buffers[pid]:
-                        linha, self.buffers[pid] = self.buffers[pid].split("\n", 1)
-                        if not linha:
-                            continue
-                        try:
-                            msg = json.loads(linha)
-                            if msg.get("tipo") == "input":
-                                self.teclas[pid] = set(msg.get("teclas", []))
-                        except json.JSONDecodeError:
-                            pass
-        except Exception:
-            pass
-        finally:
-            with self.lock:
-                self.fim_jogo = True
-            print(f"[-] J{pid} desconectou")
+        print(f"[-] J{player_id} desconectado")
 
     def _game_loop(self):
+        self._rodando = True
         dt = 1.0 / TICK_RATE
         while self._rodando:
             t0 = time.time()
-            with self.lock:
+            with self._lock:
                 if not self.fim_jogo:
                     self._tick()
-                payload = self._serializar()
-            self._broadcast(payload)
+                estado = self._serializar()
+            for pid, proxy in list(self._clientes.items()):
+                try:
+                    proxy.receber_estado(estado)
+                except Exception:
+                    pass
             time.sleep(max(0.0, dt - (time.time() - t0)))
 
     def _tick(self):
@@ -274,9 +246,9 @@ class Servidor:
     def _col(self, ax, ay, aw, ah, bx, by, bw, bh):
         return ax < bx + bw and ax + aw > bx and ay < by + bh and ay + ah > by
 
-    def _serializar(self):
+    def _serializar(self) -> dict:
         j1, j2 = self.j1, self.j2
-        return json.dumps({
+        return {
             "tipo": "estado",
             "j1": {"x": int(j1["x"]), "y": int(j1["y"]),
                    "tiros": j1["tiros"], "recarregando": j1["recarregando"]},
@@ -288,24 +260,14 @@ class Servidor:
             "proj_j2": [{"x": int(p["x"]), "y": int(p["y"])} for p in self.proj_j2],
             "pontos": self.pontos,
             "fim_jogo": self.fim_jogo,
-        }) + "\n"
+        }
 
-    def _broadcast(self, payload):
-        encoded = payload.encode("utf-8")
-        with self.lock:
-            for conn in list(self.clientes.values()):
-                try:
-                    conn.sendall(encoded)
-                except OSError:
-                    pass
-
-    def parar(self):
-        self._rodando = False
-        try:
-            self.sock.close()
-        except OSError:
-            pass
+    def iniciar(self):
+        daemon = Pyro5.server.Daemon(host="0.0.0.0", port=PORTA)
+        daemon.register(self, "ServidorJogo")
+        print(f"[*] Servidor RMI aguardando conexões na porta {PORTA}...")
+        daemon.requestLoop(lambda: True)
 
 
 if __name__ == "__main__":
-    Servidor().iniciar()
+    ServidorJogo().iniciar()
