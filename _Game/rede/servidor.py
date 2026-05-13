@@ -23,7 +23,7 @@ TAM_VOA = 80
 @Pyro5.api.expose
 class ServidorJogo:
     def __init__(self):
-        self._clientes = {}
+        self._uris_clientes = {}
         self._lock = threading.Lock()
         self._rodando = False
         self._n_conectados = 0
