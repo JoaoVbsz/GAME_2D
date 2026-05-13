@@ -72,12 +72,7 @@ class ServidorJogo:
     def desconectar(self, player_id: int):
         with self._lock:
             self.fim_jogo = True
-            proxy = self._clientes.pop(player_id, None)
-        if proxy:
-            try:
-                proxy._pyroRelease()
-            except Exception:
-                pass
+            self._uris_clientes.pop(player_id, None)
         print(f"[-] J{player_id} desconectado")
 
     def _game_loop(self):
