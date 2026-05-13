@@ -230,7 +230,7 @@ def loop_rede(cliente):
 
 if __name__ == "__main__":
     from rede.cliente import Cliente
-    from rede.servidor import Servidor
+    from rede.servidor import ServidorJogo
 
     # Suporte a argumentos de linha de comando (evita menu para uso via terminal)
     if "--host" in sys.argv:

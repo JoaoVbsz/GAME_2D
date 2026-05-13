@@ -1,71 +1,66 @@
-import socket
+import Pyro5.api
+import Pyro5.server
 import threading
-import json
+
+
+@Pyro5.api.expose
+class ClienteRecebedor:
+    """Objeto remoto exposto ao servidor. Servidor chama receber_estado() via RMI."""
+
+    def __init__(self):
+        self._estado = None
+        self._lock = threading.Lock()
+
+    def receber_estado(self, estado: dict):
+        with self._lock:
+            self._estado = estado
+
+    @property
+    def estado_atual(self):
+        with self._lock:
+            return self._estado
 
 
 class Cliente:
     def __init__(self):
-        self._sock = None
-        self._buffer = ""
-        self._lock = threading.Lock()
-        self._rodando = False
-        self.estado_atual = None   # último GameState recebido
-        self.player_id = None      # 0 ou 1, enviado pelo servidor na init
+        self._recebedor = ClienteRecebedor()
+        self._daemon = None
+        self._proxy_servidor = None
+        self.player_id = None
         self.conectado = False
         self.erro = None
 
     def conectar(self, ip: str, porta: int):
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._sock.settimeout(10.0)
-        self._sock.connect((ip, porta))
-        self._sock.settimeout(None)
-        self._rodando = True
-        self.conectado = True
-        threading.Thread(target=self._loop_receber, daemon=True).start()
+        self._daemon = Pyro5.server.Daemon()
+        uri = self._daemon.register(self._recebedor)
+        threading.Thread(target=self._daemon.requestLoop, daemon=True).start()
 
-    def _loop_receber(self):
-        try:
-            while self._rodando:
-                dados = self._sock.recv(4096).decode("utf-8", errors="ignore")
-                if not dados:
-                    break
-                with self._lock:
-                    self._buffer += dados
-                    while "\n" in self._buffer:
-                        linha, self._buffer = self._buffer.split("\n", 1)
-                        if not linha:
-                            continue
-                        try:
-                            msg = json.loads(linha)
-                            if msg.get("tipo") == "init":
-                                self.player_id = msg["player_id"]
-                            elif msg.get("tipo") == "estado":
-                                self.estado_atual = msg
-                            elif msg.get("tipo") == "erro":
-                                self.erro = msg.get("msg", "Erro desconhecido")
-                                self._rodando = False
-                        except json.JSONDecodeError:
-                            pass
-        except Exception as e:
-            self.erro = str(e)
-        finally:
-            self.conectado = False
-            self._rodando = False
+        self._proxy_servidor = Pyro5.api.Proxy(f"PYRO:ServidorJogo@{ip}:{porta}")
+        self.player_id = self._proxy_servidor.conectar(str(uri))
+        self.conectado = True
 
     def enviar_input(self, teclas: list):
-        if not self.conectado or self.player_id is None:
+        if not self.conectado:
             return
         try:
-            payload = (json.dumps({"tipo": "input", "player_id": self.player_id,
-                                   "teclas": teclas}) + "\n").encode("utf-8")
-            self._sock.sendall(payload)
-        except OSError:
+            self._proxy_servidor.processar_input(self.player_id, teclas)
+        except Exception as e:
+            self.erro = str(e)
             self.conectado = False
 
+    @property
+    def estado_atual(self):
+        return self._recebedor.estado_atual
+
     def desconectar(self):
-        self._rodando = False
+        if self._proxy_servidor and self.player_id is not None:
+            try:
+                self._proxy_servidor.desconectar(self.player_id)
+            except Exception:
+                pass
         self.conectado = False
-        try:
-            self._sock.close()
-        except OSError:
-            pass
+        if self._daemon:
+            try:
+                self._daemon.shutdown()
+            except Exception:
+                pass

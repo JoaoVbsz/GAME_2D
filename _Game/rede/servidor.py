@@ -87,7 +87,7 @@ class ServidorJogo:
                 if not self.fim_jogo:
                     self._tick()
                 estado = self._serializar()
-            for pid, proxy in list(self._clientes.items()):
+            for proxy in list(self._clientes.values()):
                 try:
                     proxy.receber_estado(estado)
                 except Exception:
