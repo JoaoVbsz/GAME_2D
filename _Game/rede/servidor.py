@@ -54,8 +54,10 @@ class ServidorJogo:
 
     def conectar(self, uri_cliente: str) -> int:
         with self._lock:
+            if self._n_conectados >= 2:
+                raise Exception("Partida cheia")
             pid = self._n_conectados
-            self._clientes[pid] = Pyro5.api.Proxy(uri_cliente)
+            self._uris_clientes[pid] = uri_cliente
             self._n_conectados += 1
             n = self._n_conectados
         print(f"[+] J{pid} conectado via RMI: {uri_cliente}")
