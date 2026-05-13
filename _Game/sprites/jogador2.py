@@ -23,9 +23,6 @@ class Jogador2(pygame.sprite.Sprite):
                 self.recarregando = False
                 self.tiros = 5
 
-        # We handle movement here instead of mover() so it works locally easily,
-        # but the note mentioned `mover(teclas: list[str])`. 
-        # I'll just use normal pygame.key.get_pressed() for local testing as asked by the architecture evolution.
         teclas = pygame.key.get_pressed()
         if teclas[pygame.K_a]:
             self.rect.x -= self.velocidade

@@ -9,14 +9,13 @@ class InimigoVoador(pygame.sprite.Sprite):
     def __init__(self, single_player, *grupos):
         super().__init__(*grupos)
 
-        # placeholder: pb_magic.png — substituir por sprite próprio
         self.image = carregar_imagem(DIR_IMAGENS / "inimigo_voador.png").convert_alpha()
         self.image = pygame.transform.scale(self.image, [80, 80])
         self.image = pygame.transform.flip(self.image, True, False)
         self.mask = pygame.mask.from_surface(self.image)
 
         if single_player:
-            # J1 jump max height is around ALTURA - 220, ground is ALTURA - 100
+            # A altura máxima do salto J1 é de aproximadamente ALTURA - 220, o solo é ALTURA - 100
             min_y = ALTURA - 220
             max_y = ALTURA - 150
             self.y_base = random.randint(min_y, max_y)

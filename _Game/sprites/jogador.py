@@ -22,7 +22,6 @@ class Jogador(pygame.sprite.Sprite):
         self.velocidade = 0
         self.aceleracao = 0.5
 
-        # True em single player; False quando J2 está conectado no multiplayer
         self.pode_pular = True
 
         self.tiros = 5
