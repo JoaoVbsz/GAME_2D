@@ -243,7 +243,7 @@ if __name__ == "__main__":
         escolha, ip_guest = tela_menu()
 
     if escolha == "host":
-        srv = Servidor()
+        srv = ServidorJogo()
         threading.Thread(target=srv.iniciar, daemon=True).start()
         ip_conectar = "127.0.0.1"
         tela_info("Aguardando 2o jogador...", f"Seu IP: {obter_ip_local()}  Porta: {PORTA}")
@@ -256,7 +256,7 @@ if __name__ == "__main__":
         try:
             cli.conectar(ip_conectar, PORTA)
             break
-        except OSError:
+        except (OSError, Pyro5.errors.CommunicationError, Exception):
             time.sleep(0.3)
     else:
         tela_info("Erro ao conectar", ip_conectar)
