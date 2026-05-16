@@ -31,7 +31,7 @@ class Jogador(pygame.sprite.Sprite):
     def update(self):
         agora = pygame.time.get_ticks()
         if self.recarregando:
-            if agora - self.tempo_inicio_recarga >= 2000:  # 2 segundos
+            if agora - self.tempo_inicio_recarga >= 2000:
                 self.recarregando = False
                 self.tiros = 5
 

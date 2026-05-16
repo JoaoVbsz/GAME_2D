@@ -1,9 +1,3 @@
-"""
-Cliente do jogo Time Out — Multiplayer em Rede
-Rodar: python main.py
-  [H] Hospedar — inicia servidor interno e entra como J1
-  [E] Entrar   — conecta no IP do host
-"""
 import pygame
 import sys
 import socket
@@ -36,8 +30,6 @@ try:
 except (pygame.error, NotImplementedError):
     pass
 
-
-# ─── Utilitários de render ────────────────────────────────────────────────────
 
 def render_texto(texto, cor=(255, 255, 255), tamanho_multiplicador=3):
     largura_estimada = max(len(texto) * 7, 20) + 10
@@ -84,7 +76,6 @@ def tela_digitar_ip():
 
 
 def tela_menu():
-    """Retorna ('host', None) ou ('guest', <ip>)."""
     titulo   = render_texto("TIME OUT", (220, 100, 50), 6)
     opt_h    = render_texto("[H]  Hospedar partida", (100, 220, 100), 3)
     opt_e    = render_texto("[E]  Entrar na partida", (100, 180, 255), 3)
@@ -128,8 +119,6 @@ def desenhar_fim_de_jogo():
     tela.blit(texto, (LARGURA // 2 - texto.get_width() // 2, ALTURA // 2 - texto.get_height() // 2))
 
 
-# ─── Loop principal em modo rede ──────────────────────────────────────────────
-
 def loop_rede(cliente):
     from sprites.carregador import carregar_imagem
     from configuracoes import DIR_IMAGENS
@@ -144,6 +133,8 @@ def loop_rede(cliente):
     img_voa = pygame.transform.flip(
         pygame.transform.scale(
             carregar_imagem(DIR_IMAGENS / "inimigo_voador.png").convert_alpha(), (80, 80)), True, False)
+    img_fireball = pygame.transform.scale(
+        carregar_imagem(DIR_IMAGENS / "Fireball1.png").convert_alpha(), (40, 40))
 
     grupo_fundo = pygame.sprite.Group()
     Fundo(LARGURA, ALTURA, grupo_fundo)
@@ -193,9 +184,9 @@ def loop_rede(cliente):
             tela.blit(img_voa, (e["x"], e["y"]))
 
         for p in estado.get("proj_j1", []):
-            pygame.draw.rect(tela, (255, 200, 50), (int(p["x"]), int(p["y"]), 20, 20))
+            tela.blit(img_fireball, (int(p["x"]), int(p["y"])))
         for p in estado.get("proj_j2", []):
-            pygame.draw.rect(tela, (100, 200, 255), (int(p["x"]), int(p["y"]), 20, 20))
+            tela.blit(img_fireball, (int(p["x"]), int(p["y"])))
 
         j1 = estado.get("j1", {})
         j2 = estado.get("j2", {})
@@ -226,13 +217,10 @@ def loop_rede(cliente):
         pygame.display.update()
 
 
-# ─── Entry point ─────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     from rede.cliente import Cliente
     from rede.servidor import ServidorJogo
 
-    # Suporte a argumentos de linha de comando (evita menu para uso via terminal)
     if "--host" in sys.argv:
         escolha, ip_guest = "host", None
     elif "--join" in sys.argv:

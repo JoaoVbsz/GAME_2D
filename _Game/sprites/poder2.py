@@ -10,7 +10,7 @@ class Poder2(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
         self.largura = largura
-        self.velocidade = 8 # a bit faster
+        self.velocidade = 8
 
     def update(self):
         self.rect.x += self.velocidade

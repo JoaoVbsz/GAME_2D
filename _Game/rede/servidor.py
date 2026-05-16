@@ -102,7 +102,6 @@ class ServidorJogo:
         pk1 = self.teclas_prev[0]
         pk2 = self.teclas_prev[1]
 
-        # J1 horizontal
         j1 = self.j1
         if "RIGHT" in tk1:
             j1["vx"] += ACEL_J1
@@ -114,7 +113,6 @@ class ServidorJogo:
         if j1["x"] in (0.0, float(LARGURA - TAM_J)):
             j1["vx"] = 0.0
 
-        # J1 pulo
         if "UP" in tk1 and not j1["pulando"]:
             j1["pulando"] = True
             j1["vy"] = float(VEL_PULO)
@@ -127,12 +125,10 @@ class ServidorJogo:
                 j1["pulando"] = False
                 j1["vy"] = 0.0
 
-        # J1 recarga
         if j1["recarregando"] and agora - j1["recarga_t"] >= RECARGA_S:
             j1["recarregando"] = False
             j1["tiros"] = MAX_TIROS
 
-        # J1 tiro (borda de subida)
         if "K" in tk1 and "K" not in pk1 and not j1["recarregando"] and j1["tiros"] > 0:
             j1["tiros"] -= 1
             if j1["tiros"] == 0:
@@ -140,7 +136,6 @@ class ServidorJogo:
                 j1["recarga_t"] = agora
             self.proj_j1.append({"x": j1["x"] + TAM_J / 2, "y": j1["y"] + TAM_J / 2, "id": self._nid_inc()})
 
-        # J2 movimento livre
         j2 = self.j2
         if "D" in tk2:
             j2["x"] += VEL_J2
@@ -153,12 +148,10 @@ class ServidorJogo:
         j2["x"] = max(0.0, min(float(LARGURA - TAM_J), j2["x"]))
         j2["y"] = max(0.0, min(float(ALTURA - TAM_J), j2["y"]))
 
-        # J2 recarga
         if j2["recarregando"] and agora - j2["recarga_t"] >= RECARGA_S:
             j2["recarregando"] = False
             j2["tiros"] = MAX_TIROS
 
-        # J2 tiro (borda de subida)
         if "V" in tk2 and "V" not in pk2 and not j2["recarregando"] and j2["tiros"] > 0:
             j2["tiros"] -= 1
             if j2["tiros"] == 0:
@@ -169,7 +162,6 @@ class ServidorJogo:
         self.teclas_prev[0] = set(tk1)
         self.teclas_prev[1] = set(tk2)
 
-        # Projéteis
         for p in self.proj_j1:
             p["x"] += VEL_PROJ
         for p in self.proj_j2:
@@ -177,7 +169,6 @@ class ServidorJogo:
         self.proj_j1 = [p for p in self.proj_j1 if 0 <= p["x"] <= LARGURA]
         self.proj_j2 = [p for p in self.proj_j2 if 0 <= p["x"] <= LARGURA]
 
-        # Spawn inimigos
         self._t_ini += 1
         if self._t_ini >= 30:
             self._t_ini = 0
@@ -186,14 +177,13 @@ class ServidorJogo:
                                       "y": float(ALTURA - 100), "id": self._nid_inc()})
 
         self._t_voa += 1
-        if self._t_voa >= 50:
+        if self._t_voa >= 30:
             self._t_voa = 0
-            if random.random() < 0.25:
+            if random.random() < 0.55:
                 yb = float(random.randint(int(ALTURA * 0.1), int(ALTURA * 0.5)))
                 self.voadores.append({"x": float(LARGURA + random.randint(0, LARGURA // 3)),
                                       "y_base": yb, "y": yb, "tick": 0, "id": self._nid_inc()})
 
-        # Mover inimigos
         for e in self.inimigos:
             e["x"] -= 2.5
         for e in self.voadores:
@@ -201,7 +191,6 @@ class ServidorJogo:
             e["tick"] += 1
             e["y"] = e["y_base"] + math.sin(e["tick"] * 0.04) * 40
 
-        # Colisão proj_j1 × terrestres
         mortos_ini = set()
         mortos_p1 = set()
         for p in self.proj_j1:
@@ -214,7 +203,6 @@ class ServidorJogo:
         self.inimigos = [e for e in self.inimigos if e["id"] not in mortos_ini]
         self.proj_j1 = [p for p in self.proj_j1 if p["id"] not in mortos_p1]
 
-        # Colisão proj_j2 × voadores
         mortos_voa = set()
         mortos_p2 = set()
         for p in self.proj_j2:
@@ -227,7 +215,6 @@ class ServidorJogo:
         self.voadores = [e for e in self.voadores if e["id"] not in mortos_voa]
         self.proj_j2 = [p for p in self.proj_j2 if p["id"] not in mortos_p2]
 
-        # Inimigo toca jogador
         for e in self.inimigos:
             if self._col(e["x"], e["y"], 100, 100, j1["x"], j1["y"], TAM_J, TAM_J):
                 self.fim_jogo = True
@@ -235,7 +222,6 @@ class ServidorJogo:
             if self._col(e["x"], e["y"], TAM_VOA, TAM_VOA, j2["x"], j2["y"], TAM_J, TAM_J):
                 self.fim_jogo = True
 
-        # Saíram da tela
         saiu_ini = [e for e in self.inimigos if e["x"] < -100]
         self.inimigos = [e for e in self.inimigos if e["x"] >= -100]
         self.pontos[0] -= 10 * len(saiu_ini)

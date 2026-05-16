@@ -5,8 +5,6 @@ import threading
 
 @Pyro5.api.expose
 class ClienteRecebedor:
-    """Objeto remoto exposto ao servidor. Servidor chama receber_estado() via RMI."""
-
     def __init__(self):
         self._estado = None
         self._lock = threading.Lock()

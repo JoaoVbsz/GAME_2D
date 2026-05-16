@@ -15,7 +15,6 @@ class InimigoVoador(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
 
         if single_player:
-            # A altura máxima do salto J1 é de aproximadamente ALTURA - 220, o solo é ALTURA - 100
             min_y = ALTURA - 220
             max_y = ALTURA - 150
             self.y_base = random.randint(min_y, max_y)
