@@ -31,7 +31,12 @@ class Cliente:
         self.erro = None
 
     def conectar(self, ip: str, porta: int):
-        self._daemon = Pyro5.server.Daemon()
+        import socket as _socket
+        _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        _s.connect((ip, porta))
+        _meu_ip = _s.getsockname()[0]
+        _s.close()
+        self._daemon = Pyro5.server.Daemon(host=_meu_ip)
         uri = self._daemon.register(self._recebedor)
         threading.Thread(target=self._daemon.requestLoop, daemon=True).start()
 
