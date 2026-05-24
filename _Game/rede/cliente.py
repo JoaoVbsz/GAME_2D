@@ -1,69 +1,90 @@
-import Pyro5.api
-import Pyro5.server
+import socket
+import json
 import threading
-
-
-@Pyro5.api.expose
-class ClienteRecebedor:
-    def __init__(self):
-        self._estado = None
-        self._lock = threading.Lock()
-
-    def receber_estado(self, estado: dict):
-        with self._lock:
-            self._estado = estado
-
-    @property
-    def estado_atual(self):
-        with self._lock:
-            return self._estado
-
 
 class Cliente:
     def __init__(self):
-        self._recebedor = ClienteRecebedor()
-        self._daemon = None
-        self._proxy_servidor = None
+        self._socket = None
+        self._estado = None
+        self._lock = threading.Lock()
         self.player_id = None
         self.conectado = False
         self.erro = None
 
     def conectar(self, ip: str, porta: int):
-        import socket as _socket
-        _s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
-        _s.connect((ip, porta))
-        _meu_ip = _s.getsockname()[0]
-        _s.close()
-        self._daemon = Pyro5.server.Daemon(host=_meu_ip)
-        uri = self._daemon.register(self._recebedor)
-        threading.Thread(target=self._daemon.requestLoop, daemon=True).start()
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.connect((ip, porta))
+            
+            # Usar makefile para ler linhas com segurança
+            self._arquivo_leitura = self._socket.makefile('r', encoding='utf-8')
+            
+            # Receber handshake: {"tipo":"conectado","player_id":0}
+            linha = self._arquivo_leitura.readline()
+            if not linha:
+                raise Exception("Conexão fechada pelo servidor no handshake")
+            
+            msg = json.loads(linha.strip())
+            if msg.get("tipo") == "conectado":
+                self.player_id = msg.get("player_id")
+                self.conectado = True
+                threading.Thread(target=self._receber_loop, daemon=True).start()
+            else:
+                raise Exception(f"Mensagem de boas-vindas inesperada: {msg}")
+        except Exception as e:
+            self.erro = str(e)
+            self.conectado = False
+            if self._socket:
+                self._socket.close()
+            raise e
 
-        self._proxy_servidor = Pyro5.api.Proxy(f"PYRO:ServidorJogo@{ip}:{porta}")
-        self.player_id = self._proxy_servidor.conectar(str(uri))
-        self.conectado = True
+    def _receber_loop(self):
+        try:
+            while self.conectado:
+                linha = self._arquivo_leitura.readline()
+                if not linha:
+                    break
+                
+                try:
+                    estado = json.loads(linha.strip())
+                    with self._lock:
+                        self._estado = estado
+                except json.JSONDecodeError:
+                    continue
+        except Exception as e:
+            if self.conectado:
+                self.erro = str(e)
+        finally:
+            self.conectado = False
+            self._socket.close()
 
     def enviar_input(self, teclas: list):
-        if not self.conectado:
+        if not self.conectado or self.player_id is None:
             return
+        
+        payload = {
+            "tipo": "input",
+            "player_id": self.player_id,
+            "teclas": teclas
+        }
+        
         try:
-            self._proxy_servidor.processar_input(self.player_id, teclas)
+            with self._lock:
+                msg = json.dumps(payload) + "\n"
+                self._socket.sendall(msg.encode('utf-8'))
         except Exception as e:
             self.erro = str(e)
             self.conectado = False
 
     @property
     def estado_atual(self):
-        return self._recebedor.estado_atual
+        with self._lock:
+            return self._estado
 
     def desconectar(self):
-        if self._proxy_servidor and self.player_id is not None:
-            try:
-                self._proxy_servidor.desconectar(self.player_id)
-            except Exception:
-                pass
         self.conectado = False
-        if self._daemon:
+        if self._socket:
             try:
-                self._daemon.shutdown()
+                self._socket.close()
             except Exception:
                 pass

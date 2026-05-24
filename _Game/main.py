@@ -1,9 +1,7 @@
 import pygame
 import sys
 import socket
-import threading
 import time
-import Pyro5.errors
 from configuracoes import LARGURA, ALTURA, FPS, TITULO, DIR_SONS, PORTA
 from PIL import Image, ImageDraw
 from sprites.fundo import Fundo
@@ -77,7 +75,6 @@ def tela_digitar_ip():
 
 def tela_menu():
     titulo   = render_texto("TIME OUT", (220, 100, 50), 6)
-    opt_h    = render_texto("[H]  Hospedar partida", (100, 220, 100), 3)
     opt_e    = render_texto("[E]  Entrar na partida", (100, 180, 255), 3)
     opt_esc  = render_texto("[ESC]  Sair", (130, 130, 130), 3)
     while True:
@@ -87,9 +84,7 @@ def tela_menu():
                 pygame.quit()
                 sys.exit()
             elif ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_h:
-                    return ("host", None)
-                elif ev.key == pygame.K_e:
+                if ev.key == pygame.K_e:
                     ip = tela_digitar_ip()
                     return ("guest", ip)
                 elif ev.key == pygame.K_ESCAPE:
@@ -97,9 +92,8 @@ def tela_menu():
                     sys.exit()
         tela.fill((20, 20, 40))
         tela.blit(titulo, (LARGURA // 2 - titulo.get_width() // 2, 55))
-        tela.blit(opt_h,   (LARGURA // 2 - opt_h.get_width() // 2, 180))
-        tela.blit(opt_e,   (LARGURA // 2 - opt_e.get_width() // 2, 240))
-        tela.blit(opt_esc, (LARGURA // 2 - opt_esc.get_width() // 2, 320))
+        tela.blit(opt_e,   (LARGURA // 2 - opt_e.get_width() // 2, 210))
+        tela.blit(opt_esc, (LARGURA // 2 - opt_esc.get_width() // 2, 290))
         pygame.display.update()
 
 
@@ -173,7 +167,7 @@ def loop_rede(cliente):
 
         estado = cliente.estado_atual
         if estado is None:
-            tela_info("Aguardando 2o jogador...", f"IP: {obter_ip_local()}  Porta: {PORTA}")
+            tela_info("Aguardando 2o jogador...", f"Conectado ao Java Server na Porta: {PORTA}")
             continue
 
         grupo_fundo.draw(tela)
@@ -219,24 +213,15 @@ def loop_rede(cliente):
 
 if __name__ == "__main__":
     from rede.cliente import Cliente
-    from rede.servidor import ServidorJogo
 
-    if "--host" in sys.argv:
-        escolha, ip_guest = "host", None
-    elif "--join" in sys.argv:
+    if "--join" in sys.argv:
         idx = sys.argv.index("--join")
         ip_arg = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
         escolha, ip_guest = ("guest", ip_arg) if ip_arg else tela_menu()
     else:
         escolha, ip_guest = tela_menu()
 
-    if escolha == "host":
-        srv = ServidorJogo()
-        threading.Thread(target=srv.iniciar, daemon=True).start()
-        ip_conectar = "127.0.0.1"
-        tela_info("Aguardando 2o jogador...", f"Seu IP: {obter_ip_local()}  Porta: {PORTA}")
-    else:
-        ip_conectar = ip_guest
+    ip_conectar = ip_guest
 
     cli = Cliente()
     tela_info("Conectando...", ip_conectar)
@@ -244,17 +229,12 @@ if __name__ == "__main__":
         try:
             cli.conectar(ip_conectar, PORTA)
             break
-        except (OSError, Pyro5.errors.CommunicationError, Exception):
+        except Exception:
             time.sleep(0.3)
     else:
         tela_info("Erro ao conectar", ip_conectar)
         time.sleep(3)
         pygame.quit()
         sys.exit()
-
-    for _ in range(50):
-        if cli.player_id is not None:
-            break
-        time.sleep(0.1)
 
     loop_rede(cli)

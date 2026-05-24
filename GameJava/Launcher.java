@@ -17,7 +17,7 @@ public class Launcher {
 
     private static final String OUT_DIR = "out";
     private static final String SRC_DIR = "src";
-    private static final String ASSETS  = "../_Game/assets";
+    private static final String GAME_PY = "../_Game/main.py";
 
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -97,7 +97,7 @@ public class Launcher {
                 "IP do servidor:", "Conectar", JOptionPane.PLAIN_MESSAGE, null, null, "");
             if (ip != null && !ip.isBlank()) {
                 frame.dispose();
-                rodar("cliente.Main", ASSETS, "--join", ip.trim());
+                rodarPython(ip.trim());
             }
         });
 
@@ -178,6 +178,21 @@ public class Launcher {
             }
         } catch (Exception ignored) {}
         return "127.0.0.1";
+    }
+
+    private static void rodarPython(String ipServidor) {
+        try {
+            String python = System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3";
+            List<String> cmd = new ArrayList<>(Arrays.asList(python, GAME_PY, "--join", ipServidor));
+            new ProcessBuilder(cmd)
+                .directory(Paths.get("").toAbsolutePath().toFile())
+                .inheritIO()
+                .start()
+                .waitFor();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null,
+                "Erro ao iniciar Python: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     // ─── Execução em subprocess ────────────────────────────────────────────────
