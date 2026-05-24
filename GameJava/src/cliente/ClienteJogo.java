@@ -30,7 +30,10 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
     public ClienteJogo(String ip, boolean singlePlayer) throws Exception {
         super();
         this.singlePlayer = singlePlayer;
-        System.setProperty("java.rmi.server.hostname", getIpLocal());
+        String ipLocal = getIpLocal();
+        System.setProperty("java.rmi.server.hostname", ipLocal);
+        System.out.println("[*] IP local do cliente: " + ipLocal);
+        System.out.println("[*] Conectando ao servidor: " + ip + ":" + Configuracoes.PORTA);
         carregarImagens();
         try {
             Registry reg = LocateRegistry.getRegistry(ip, Configuracoes.PORTA);
@@ -38,12 +41,15 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
 
             playerId = srv.conectar(this, singlePlayer);
             if (playerId == -1) {
+                System.err.println("[!] Servidor cheio.");
                 JOptionPane.showMessageDialog(null, "Servidor cheio ou erro na conexao.");
                 System.exit(0);
             }
+            System.out.println("[+] Conectado como J" + playerId);
             iniciarUI();
             iniciarLoopInput();
         } catch (Exception e) {
+            System.err.println("[!] Erro ao conectar: " + e);
             JOptionPane.showMessageDialog(null, "Erro ao conectar: " + e.getMessage());
             System.exit(0);
         }
