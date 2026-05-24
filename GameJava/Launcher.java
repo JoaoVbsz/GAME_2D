@@ -83,8 +83,23 @@ public class Launcher {
         JButton btnSrv = criarBotao("1 — Servidor",  new Color(100, 220, 100));
         JButton btnCli = criarBotao("2 — Cliente",   new Color(100, 180, 255));
 
-        btnSrv.addActionListener(e -> { frame.dispose(); rodar("servidor.ServidorJogo"); });
-        btnCli.addActionListener(e -> { frame.dispose(); rodar("cliente.Main", ASSETS);  });
+        btnSrv.addActionListener(e -> {
+            String ip = ipLocal();
+            JOptionPane.showMessageDialog(frame,
+                "Servidor iniciando...\nSeu IP: " + ip + "\nPorta: 5555",
+                "Servidor", JOptionPane.INFORMATION_MESSAGE);
+            frame.dispose();
+            liberarPorta(5555);
+            rodar("servidor.ServidorJogo");
+        });
+        btnCli.addActionListener(e -> {
+            String ip = (String) JOptionPane.showInputDialog(frame,
+                "IP do servidor:", "Conectar", JOptionPane.PLAIN_MESSAGE, null, null, "");
+            if (ip != null && !ip.isBlank()) {
+                frame.dispose();
+                rodar("cliente.Main", ASSETS, "--join", ip.trim());
+            }
+        });
 
         JPanel btns = new JPanel(new GridLayout(2, 1, 0, 14));
         btns.setOpaque(false);
@@ -128,6 +143,41 @@ public class Launcher {
             @Override public void mouseExited(MouseEvent e)  { b.setBackground(new Color(35, 35, 60)); }
         });
         return b;
+    }
+
+    private static void liberarPorta(int porta) {
+        try {
+            Process netstat = new ProcessBuilder("netstat", "-ano")
+                .redirectErrorStream(true).start();
+            try (java.io.BufferedReader br = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(netstat.getInputStream()))) {
+                String linha;
+                while ((linha = br.readLine()) != null) {
+                    if (linha.contains(":" + porta) && linha.contains("LISTENING")) {
+                        String[] partes = linha.trim().split("\\s+");
+                        String pid = partes[partes.length - 1];
+                        new ProcessBuilder("taskkill", "/PID", pid, "/F")
+                            .redirectErrorStream(true).start().waitFor();
+                        System.out.println("[Launcher] Processo " + pid + " encerrado (porta " + porta + ").");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[Launcher] Falha ao liberar porta: " + e.getMessage());
+        }
+    }
+
+    private static String ipLocal() {
+        try {
+            for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+                for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
+                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
+                    if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "127.0.0.1";
     }
 
     // ─── Execução em subprocess ────────────────────────────────────────────────

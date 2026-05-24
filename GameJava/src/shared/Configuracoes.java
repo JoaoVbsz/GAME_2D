@@ -1,6 +1,8 @@
 package shared;
 
-import java.net.Socket;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Collections;
 
 public class Configuracoes {
     public static final int LARGURA = 736;
@@ -10,11 +12,15 @@ public class Configuracoes {
     public static final int PORTA = 5555;
 
     public static String getIpLocal() {
-        try (Socket s = new Socket()) {
-            s.connect(new java.net.InetSocketAddress("8.8.8.8", 80));
-            return s.getLocalAddress().getHostAddress();
-        } catch (Exception e) {
-            return "127.0.0.1";
-        }
+        try {
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+                for (InetAddress addr : Collections.list(ni.getInetAddresses())) {
+                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
+                    if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "127.0.0.1";
     }
 }

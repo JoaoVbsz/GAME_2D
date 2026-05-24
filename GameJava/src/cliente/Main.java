@@ -21,10 +21,10 @@ public class Main {
         String ip = Configuracoes.getIpLocal();
         System.setProperty("java.rmi.server.hostname", ip);
 
-        if (args.length > 0 && args[0].equals("--host")) {
+        if (args.length > 1 && args[1].equals("--host")) {
             iniciarComoHost(ip);
-        } else if (args.length > 1 && args[0].equals("--join")) {
-            conectar(args[1], ip);
+        } else if (args.length > 2 && args[1].equals("--join")) {
+            conectar(args[2], ip);
         } else {
             mostrarMenu(ip);
         }
