@@ -15,6 +15,7 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
     private static final int LARGURA = 736;
     private static final int ALTURA = 414;
     private static final int PORTA_RMI = 5555;
+    private static final int PORTA_OBJETO = 5556;
     private static final double GRAVIDADE = 1;
     private static final double VEL_PULO = -15;
     private static final double ACEL_J1 = 0.5;
@@ -60,7 +61,7 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
     private final Random rng = new Random();
 
     public ServidorJogo() throws RemoteException {
-        super();
+        super(PORTA_OBJETO);
         reset();
     }
 

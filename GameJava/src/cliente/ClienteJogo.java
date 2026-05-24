@@ -27,8 +27,10 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
 
     private BufferedImage imgJ1, imgJ2, imgIni, imgVoa, imgFireball, imgFundo;
 
+    private static final int PORTA_CALLBACK = 5557;
+
     public ClienteJogo(String ip, boolean singlePlayer) throws Exception {
-        super();
+        super(PORTA_CALLBACK);
         this.singlePlayer = singlePlayer;
         String ipLocal = getIpLocal();
         System.setProperty("java.rmi.server.hostname", ipLocal);
