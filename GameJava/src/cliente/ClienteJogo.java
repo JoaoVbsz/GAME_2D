@@ -36,7 +36,7 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
             Registry reg = LocateRegistry.getRegistry(ip, Configuracoes.PORTA);
             srv = (IJogoServidor) reg.lookup("ServidorJogo");
 
-            playerId = srv.conectar(this);
+            playerId = srv.conectar(this, singlePlayer);
             if (playerId == -1) {
                 JOptionPane.showMessageDialog(null, "Servidor cheio ou erro na conexao.");
                 System.exit(0);
@@ -49,7 +49,7 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
         }
     }
 
-    private static final String DIR_IMG = "../_Game/assets/imagens/";
+    private static final String DIR_IMG = "assets/imagens/";
 
     private void carregarImagens() {
         imgJ1       = carregarEscalar("mago_player.png",    100, 100, false);
@@ -180,7 +180,18 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
     private void desenhar(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         String json = estadoJson;
-        if (json == null || json.isEmpty()) return;
+        if (json == null || json.isEmpty()) {
+            if (!singlePlayer) {
+                g.setColor(new Color(20, 20, 40));
+                g.fillRect(0, 0, Configuracoes.LARGURA, Configuracoes.ALTURA);
+                g.setColor(Color.WHITE);
+                g.setFont(new Font("Monospaced", Font.BOLD, 24));
+                String msg = "Aguardando J2...";
+                int mw = g.getFontMetrics().stringWidth(msg);
+                g.drawString(msg, (Configuracoes.LARGURA - mw) / 2, Configuracoes.ALTURA / 2);
+            }
+            return;
+        }
 
         try {
             // J1

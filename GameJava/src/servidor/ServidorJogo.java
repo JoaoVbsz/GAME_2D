@@ -78,7 +78,7 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
     private int nextId() { return ++nid; }
 
     @Override
-    public int conectar(IClienteCallback callback) throws RemoteException {
+    public int conectar(IClienteCallback callback, boolean solo) throws RemoteException {
         lock.lock();
         try {
             int pid = callbacks.size();
@@ -86,8 +86,9 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
             callbacks.put(pid, callback);
             System.out.println("[+] J" + pid + " conectado via RMI callback");
 
-            System.out.println("[*] Aguardando 2 jogadores (" + callbacks.size() + "/2)...");
-            if (!rodando && callbacks.size() == 2) {
+            boolean pronto = solo || callbacks.size() == 2;
+            if (!pronto) System.out.println("[*] Aguardando 2 jogadores (" + callbacks.size() + "/2)...");
+            if (!rodando && pronto) {
                 new Thread(this::gameLoop).start();
             }
             return pid;
