@@ -363,26 +363,9 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
     }
 
     private static String getIpLocal() {
-        try {
-            for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
-                if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
-                String nome = ni.getDisplayName().toLowerCase();
-                if (nome.contains("virtual") || nome.contains("hyper-v") ||
-                    nome.contains("vmware") || nome.contains("vethernet") ||
-                    nome.contains("docker") || nome.contains("wsl") ||
-                    nome.contains("hamachi") || nome.contains("tap") ||
-                    nome.contains("tunnel") || nome.contains("vpn")) continue;
-                for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
-                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
-                    if (!(addr instanceof java.net.Inet4Address)) continue;
-                    byte[] b = addr.getAddress();
-                    int b0 = b[0] & 0xFF, b1 = b[1] & 0xFF;
-                    boolean privado = (b0 == 10)
-                        || (b0 == 172 && b1 >= 16 && b1 <= 31)
-                        || (b0 == 192 && b1 == 168);
-                    if (privado) return addr.getHostAddress();
-                }
-            }
+        try (java.net.DatagramSocket s = new java.net.DatagramSocket()) {
+            s.connect(java.net.InetAddress.getByName("8.8.8.8"), 80);
+            return s.getLocalAddress().getHostAddress();
         } catch (Exception ignored) {}
         return "127.0.0.1";
     }
