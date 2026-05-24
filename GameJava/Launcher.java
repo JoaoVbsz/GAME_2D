@@ -3,6 +3,7 @@ import javax.tools.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.net.*;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,6 +17,7 @@ public class Launcher {
     private static JFrame frame;
     private static JPanel cardPanel;
     private static CardLayout cardLayout;
+    private static ClassLoader gameLoader;
 
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -54,6 +56,10 @@ public class Launcher {
             for (Diagnostic<?> d : diags.getDiagnostics())
                 if (d.getKind() == Diagnostic.Kind.ERROR)
                     System.err.println(d.toString());
+            if (ok) gameLoader = new URLClassLoader(
+                new URL[]{ Paths.get(OUT_DIR).toAbsolutePath().toUri().toURL() },
+                Launcher.class.getClassLoader()
+            );
             return ok;
         }
     }
@@ -240,9 +246,10 @@ public class Launcher {
             try {
                 String ip = ipLocal();
                 System.setProperty("java.rmi.server.hostname", ip);
-                servidor.ServidorJogo srv = new servidor.ServidorJogo();
+                Object srv = gameLoader.loadClass("servidor.ServidorJogo")
+                                       .getDeclaredConstructor().newInstance();
                 java.rmi.registry.Registry reg = java.rmi.registry.LocateRegistry.createRegistry(5555);
-                reg.rebind("ServidorJogo", srv);
+                reg.rebind("ServidorJogo", (java.rmi.Remote) srv);
                 System.out.println("[*] Servidor embutido rodando em " + ip + ":5555");
                 Thread.currentThread().join();
             } catch (Exception e) {
@@ -254,7 +261,9 @@ public class Launcher {
     private static void iniciarClienteDireto(String ip) {
         SwingUtilities.invokeLater(() -> {
             try {
-                new cliente.ClienteJogo(ip, true);
+                gameLoader.loadClass("cliente.ClienteJogo")
+                          .getDeclaredConstructor(String.class, boolean.class)
+                          .newInstance(ip, true);
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(null, "Erro ao iniciar: " + e.getMessage());
             }
