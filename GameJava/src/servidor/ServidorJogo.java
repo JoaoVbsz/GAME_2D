@@ -358,6 +358,10 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         try {
             for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
                 if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+                String nome = ni.getDisplayName().toLowerCase();
+                if (nome.contains("virtual") || nome.contains("hyper-v") ||
+                    nome.contains("vmware") || nome.contains("vethernet") ||
+                    nome.contains("docker") || nome.contains("wsl")) continue;
                 for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
                     if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
                     if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
