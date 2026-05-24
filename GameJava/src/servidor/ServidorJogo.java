@@ -354,13 +354,28 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         }
     }
 
+    private static String getIpLocal() {
+        try {
+            for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+                for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
+                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
+                    if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "127.0.0.1";
+    }
+
     public static void main(String[] args) {
         try {
-            System.setProperty("java.rmi.server.hostname", "127.0.0.1");
+            String ip = getIpLocal();
+            System.setProperty("java.rmi.server.hostname", ip);
             ServidorJogo srv = new ServidorJogo();
             Registry registry = LocateRegistry.createRegistry(PORTA_RMI);
             registry.rebind("ServidorJogo", srv);
             System.out.println("[*] Servidor RMI pronto na porta " + PORTA_RMI);
+            System.out.println("[*] IP local: " + ip);
         } catch (Exception e) {
             System.err.println("Erro no Servidor RMI: " + e.toString());
             e.printStackTrace();
