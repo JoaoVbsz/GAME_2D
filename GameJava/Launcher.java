@@ -241,9 +241,23 @@ public class Launcher {
 
     // ─── Lógica de Execução ────────────────────────────────────────────────────
 
+    private static void abrirFirewall() {
+        try {
+            new ProcessBuilder("netsh", "advfirewall", "firewall", "delete", "rule", "name=TimeOut Game")
+                .redirectErrorStream(true).start().waitFor();
+            new ProcessBuilder("netsh", "advfirewall", "firewall", "add", "rule",
+                "name=TimeOut Game", "protocol=TCP", "dir=in", "localport=5555-5557", "action=allow")
+                .redirectErrorStream(true).start().waitFor();
+            System.out.println("[*] Regra de firewall criada (5555-5557)");
+        } catch (Exception e) {
+            System.err.println("[!] Firewall: " + e.getMessage() + " (abra as portas manualmente)");
+        }
+    }
+
     private static void iniciarServidorEmbutido() {
         new Thread(() -> {
             try {
+                abrirFirewall();
                 String ip = ipLocal();
                 System.setProperty("java.rmi.server.hostname", ip);
                 Object srv = gameLoader.loadClass("servidor.ServidorJogo")
