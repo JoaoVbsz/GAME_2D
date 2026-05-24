@@ -85,8 +85,9 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
             if (pid >= 2) return -1;
             callbacks.put(pid, callback);
             System.out.println("[+] J" + pid + " conectado via RMI callback");
-            
-            if (callbacks.size() == 2 && !rodando) {
+
+            System.out.println("[*] Aguardando 2 jogadores (" + callbacks.size() + "/2)...");
+            if (!rodando && callbacks.size() == 2) {
                 new Thread(this::gameLoop).start();
             }
             return pid;
@@ -174,7 +175,7 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         if (teclas0.contains("K") && !teclasPrev0.contains("K") && !j1recarregando && j1tiros > 0) {
             j1tiros--;
             if (j1tiros == 0) { j1recarregando = true; j1recargaT = agora; }
-            projJ1.add(new double[]{j1x + TAM_J / 2.0, j1y + TAM_J / 2.0, nextId()});
+            projJ1.add(new double[]{j1x + TAM_J, j1y + TAM_J / 2.0, nextId()});
         }
 
         // J2 movimento
@@ -193,7 +194,7 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         if (teclas1.contains("V") && !teclasPrev1.contains("V") && !j2recarregando && j2tiros > 0) {
             j2tiros--;
             if (j2tiros == 0) { j2recarregando = true; j2recargaT = agora; }
-            projJ2.add(new double[]{j2x + TAM_J / 2.0, j2y + TAM_J / 2.0, nextId()});
+            projJ2.add(new double[]{j2x + TAM_J, j2y + TAM_J / 2.0, nextId()});
         }
 
         teclasPrev0 = new HashSet<>(teclas0);
@@ -337,7 +338,8 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         sb.append("],");
         
         sb.append("\"pontos\":[").append(pontos[0]).append(",").append(pontos[1]).append("],");
-        sb.append("\"fim_jogo\":").append(fimJogo);
+        sb.append("\"fim_jogo\":").append(fimJogo).append(",");
+        sb.append("\"jogadores\":").append(callbacks.size());
         sb.append("}");
         return sb.toString();
     }
@@ -361,10 +363,18 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
                 String nome = ni.getDisplayName().toLowerCase();
                 if (nome.contains("virtual") || nome.contains("hyper-v") ||
                     nome.contains("vmware") || nome.contains("vethernet") ||
-                    nome.contains("docker") || nome.contains("wsl")) continue;
+                    nome.contains("docker") || nome.contains("wsl") ||
+                    nome.contains("hamachi") || nome.contains("tap") ||
+                    nome.contains("tunnel") || nome.contains("vpn")) continue;
                 for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
                     if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
-                    if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
+                    if (!(addr instanceof java.net.Inet4Address)) continue;
+                    byte[] b = addr.getAddress();
+                    int b0 = b[0] & 0xFF, b1 = b[1] & 0xFF;
+                    boolean privado = (b0 == 10)
+                        || (b0 == 172 && b1 >= 16 && b1 <= 31)
+                        || (b0 == 192 && b1 == 168);
+                    if (privado) return addr.getHostAddress();
                 }
             }
         } catch (Exception ignored) {}
@@ -380,6 +390,8 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
             registry.rebind("ServidorJogo", srv);
             System.out.println("[*] Servidor RMI pronto na porta " + PORTA_RMI);
             System.out.println("[*] IP local: " + ip);
+            System.out.println("[*] Aguardando jogadores...");
+            Thread.currentThread().join(); // mantém JVM viva
         } catch (Exception e) {
             System.err.println("Erro no Servidor RMI: " + e.toString());
             e.printStackTrace();

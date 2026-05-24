@@ -1,10 +1,6 @@
 import javax.swing.*;
 import javax.tools.*;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.GridLayout;
-import java.awt.RenderingHints;
+import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.nio.file.*;
@@ -17,7 +13,9 @@ public class Launcher {
 
     private static final String OUT_DIR = "out";
     private static final String SRC_DIR = "src";
-    private static final String GAME_PY = "../_Game/main.py";
+    private static JFrame frame;
+    private static JPanel cardPanel;
+    private static CardLayout cardLayout;
 
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -71,67 +69,221 @@ public class Launcher {
     // ─── Menu ──────────────────────────────────────────────────────────────────
 
     private static void mostrarMenu() {
-        JFrame frame = new JFrame("Time out");
+        frame = new JFrame("Time out");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
+        frame.setSize(420, 320);
+        frame.setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        cardPanel = new JPanel(cardLayout);
+
+        cardPanel.add(criarTelaPrincipal(), "principal");
+        cardPanel.add(criarTelaMultiplayer(), "multiplayer");
+
+        frame.setContentPane(cardPanel);
+
+        // Gerenciador de teclas global para atalhos
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyEventDispatcher() {
+            @Override
+            public boolean dispatchKeyEvent(KeyEvent e) {
+                if (e.getID() != KeyEvent.KEY_PRESSED) return false;
+                
+                String telaAtual = getVisibleCardName();
+                int code = e.getKeyCode();
+
+                if ("principal".equals(telaAtual)) {
+                    if (code == KeyEvent.VK_1 || code == KeyEvent.VK_NUMPAD1) {
+                        clicarBotao("1 Jogador");
+                        return true;
+                    }
+                    if (code == KeyEvent.VK_2 || code == KeyEvent.VK_NUMPAD2) {
+                        clicarBotao("2 Jogadores");
+                        return true;
+                    }
+                    if (code == KeyEvent.VK_ESCAPE) {
+                        System.exit(0);
+                        return true;
+                    }
+                } else if ("multiplayer".equals(telaAtual)) {
+                    if (code == KeyEvent.VK_S) {
+                        clicarBotao("Servidor");
+                        return true;
+                    }
+                    if (code == KeyEvent.VK_C) {
+                        clicarBotao("Cliente");
+                        return true;
+                    }
+                    if (code == KeyEvent.VK_ESCAPE) {
+                        clicarBotao("Voltar");
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+
+        frame.setVisible(true);
+    }
+
+    private static String getVisibleCardName() {
+        for (Component comp : cardPanel.getComponents()) {
+            if (comp.isVisible()) return comp.getName();
+        }
+        return "principal";
+    }
+
+    private static void clicarBotao(String texto) {
+        JButton btn = buscarBotao(cardPanel, texto);
+        if (btn != null) btn.doClick();
+    }
+
+    private static JButton buscarBotao(Container container, String texto) {
+        for (Component c : container.getComponents()) {
+            if (c instanceof JButton && texto.equals(((JButton) c).getText())) {
+                return (JButton) c;
+            } else if (c instanceof Container) {
+                JButton b = buscarBotao((Container) c, texto);
+                if (b != null) return b;
+            }
+        }
+        return null;
+    }
+
+    private static JPanel criarTelaPrincipal() {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setName("principal");
+        p.setBackground(new Color(20, 20, 40));
 
         JLabel titulo = new JLabel("TIME OUT", SwingConstants.CENTER);
         titulo.setFont(new Font("Monospaced", Font.BOLD, 48));
         titulo.setForeground(new Color(220, 100, 50));
         titulo.setBorder(BorderFactory.createEmptyBorder(30, 0, 20, 0));
 
-        JButton btnSrv = criarBotao("1 — Servidor",  new Color(100, 220, 100));
-        JButton btnCli = criarBotao("2 — Cliente",   new Color(100, 180, 255));
+        JButton btn1P = criarBotao("1 Jogador", new Color(100, 220, 100));
+        JButton btn2P = criarBotao("2 Jogadores", new Color(100, 180, 255));
 
-        btnSrv.addActionListener(e -> {
-            String ip = ipLocal();
-            JOptionPane.showMessageDialog(frame,
-                "Servidor iniciando...\nSeu IP: " + ip + "\nPorta: 5555",
-                "Servidor", JOptionPane.INFORMATION_MESSAGE);
-            frame.dispose();
-            liberarPorta(5555);
-            rodar("servidor.ServidorJogo");
-        });
-        btnCli.addActionListener(e -> {
-            String ip = (String) JOptionPane.showInputDialog(frame,
-                "IP do servidor:", "Conectar", JOptionPane.PLAIN_MESSAGE, null, null, "");
-            if (ip != null && !ip.isBlank()) {
-                frame.dispose();
-                new Thread(() -> {
-                    try {
-                        rodar("bridge.BridgeJogo", ip.trim());
-                    } catch (Exception ex) { ex.printStackTrace(); }
-                }).start();
+        btn1P.addActionListener(e -> {
+            new Thread(() -> {
+                liberarPorta(5555);
+                iniciarServidorEmbutido();
                 try { Thread.sleep(800); } catch (InterruptedException ignored) {}
-                rodarPython("127.0.0.1");
-            }
+                iniciarClienteDireto("127.0.0.1");
+                SwingUtilities.invokeLater(() -> frame.dispose());
+            }).start();
         });
+
+        btn2P.addActionListener(e -> cardLayout.show(cardPanel, "multiplayer"));
 
         JPanel btns = new JPanel(new GridLayout(2, 1, 0, 14));
         btns.setOpaque(false);
         btns.setBorder(BorderFactory.createEmptyBorder(0, 50, 40, 50));
-        btns.add(btnSrv);
-        btns.add(btnCli);
+        btns.add(btn1P);
+        btns.add(btn2P);
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(new Color(20, 20, 40));
-        root.add(titulo, BorderLayout.NORTH);
-        root.add(btns,   BorderLayout.CENTER);
+        p.add(titulo, BorderLayout.NORTH);
+        p.add(btns, BorderLayout.CENTER);
+        return p;
+    }
 
-        frame.addKeyListener(new KeyAdapter() {
-            @Override public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_1) btnSrv.doClick();
-                if (e.getKeyCode() == KeyEvent.VK_2) btnCli.doClick();
-                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) System.exit(0);
+    private static JPanel criarTelaMultiplayer() {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setName("multiplayer");
+        p.setBackground(new Color(20, 20, 40));
+
+        JLabel titulo = new JLabel("2 JOGADORES", SwingConstants.CENTER);
+        titulo.setFont(new Font("Monospaced", Font.BOLD, 40));
+        titulo.setForeground(new Color(220, 100, 50));
+        titulo.setBorder(BorderFactory.createEmptyBorder(30, 0, 20, 0));
+
+        JButton btnSrv = criarBotao("Servidor", new Color(100, 220, 100));
+        JButton btnCli = criarBotao("Cliente", new Color(100, 180, 255));
+        JButton btnVol = criarBotao("Voltar", new Color(150, 150, 150));
+
+        btnSrv.addActionListener(e -> {
+            String ip = ipLocal();
+            JOptionPane.showMessageDialog(frame,
+                "Seu IP: " + ip + " | Porta: 5555\nAguardando cliente...",
+                "Servidor", JOptionPane.INFORMATION_MESSAGE);
+            liberarPorta(5555);
+            iniciarServidorEmbutido();
+            frame.dispose();
+        });
+
+        btnCli.addActionListener(e -> {
+            String ip = (String) JOptionPane.showInputDialog(frame,
+                "IP do servidor:", "Conectar", JOptionPane.PLAIN_MESSAGE, null, null, "");
+            if (ip != null && !ip.isBlank()) {
+                rodar("cliente.ClienteJogo", ip.trim());
+                frame.dispose();
             }
         });
 
-        frame.setContentPane(root);
-        frame.setSize(420, 320);
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
-        frame.requestFocusInWindow();
+        btnVol.addActionListener(e -> cardLayout.show(cardPanel, "principal"));
+
+        JPanel btns = new JPanel(new GridLayout(3, 1, 0, 10));
+        btns.setOpaque(false);
+        btns.setBorder(BorderFactory.createEmptyBorder(0, 50, 30, 50));
+        btns.add(btnSrv);
+        btns.add(btnCli);
+        btns.add(btnVol);
+
+        p.add(titulo, BorderLayout.NORTH);
+        p.add(btns, BorderLayout.CENTER);
+        return p;
     }
+
+    // ─── Lógica de Execução ────────────────────────────────────────────────────
+
+    private static void iniciarServidorEmbutido() {
+        new Thread(() -> {
+            try {
+                String ip = ipLocal();
+                System.setProperty("java.rmi.server.hostname", ip);
+                servidor.ServidorJogo srv = new servidor.ServidorJogo();
+                java.rmi.registry.Registry reg = java.rmi.registry.LocateRegistry.createRegistry(5555);
+                reg.rebind("ServidorJogo", srv);
+                System.out.println("[*] Servidor embutido rodando em " + ip + ":5555");
+                Thread.currentThread().join();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, "servidor-thread").start();
+    }
+
+    private static void iniciarClienteDireto(String ip) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                new cliente.ClienteJogo(ip, true);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(null, "Erro ao iniciar: " + e.getMessage());
+            }
+        });
+    }
+
+    private static void rodar(String classeMain, String... extras) {
+        try {
+            String javaExe = ProcessHandle.current().info().command()
+                .orElse(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+
+            List<String> cmd = new ArrayList<>();
+            cmd.add(javaExe);
+            cmd.add("-cp");
+            cmd.add(OUT_DIR);
+            cmd.add(classeMain);
+            Collections.addAll(cmd, extras);
+
+            new ProcessBuilder(cmd)
+                .directory(Paths.get("").toAbsolutePath().toFile())
+                .inheritIO()
+                .start();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null,
+                "Erro ao iniciar: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // ─── Utilitários ───────────────────────────────────────────────────────────
 
     private static JButton criarBotao(String texto, Color cor) {
         JButton b = new JButton(texto);
@@ -180,53 +332,21 @@ public class Launcher {
                 String nome = ni.getDisplayName().toLowerCase();
                 if (nome.contains("virtual") || nome.contains("hyper-v") ||
                     nome.contains("vmware") || nome.contains("vethernet") ||
-                    nome.contains("docker") || nome.contains("wsl")) continue;
+                    nome.contains("docker") || nome.contains("wsl") ||
+                    nome.contains("hamachi") || nome.contains("tap") ||
+                    nome.contains("tunnel") || nome.contains("vpn")) continue;
                 for (java.net.InetAddress addr : java.util.Collections.list(ni.getInetAddresses())) {
                     if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
-                    if (addr instanceof java.net.Inet4Address) return addr.getHostAddress();
+                    if (!(addr instanceof java.net.Inet4Address)) continue;
+                    byte[] b = addr.getAddress();
+                    int b0 = b[0] & 0xFF, b1 = b[1] & 0xFF;
+                    boolean privado = (b0 == 10)
+                        || (b0 == 172 && b1 >= 16 && b1 <= 31)
+                        || (b0 == 192 && b1 == 168);
+                    if (privado) return addr.getHostAddress();
                 }
             }
         } catch (Exception ignored) {}
         return "127.0.0.1";
-    }
-
-    private static void rodarPython(String ipServidor) {
-        try {
-            String python = System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3";
-            List<String> cmd = new ArrayList<>(Arrays.asList(python, GAME_PY, "--join", ipServidor));
-            new ProcessBuilder(cmd)
-                .directory(Paths.get("").toAbsolutePath().toFile())
-                .inheritIO()
-                .start()
-                .waitFor();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(null,
-                "Erro ao iniciar Python: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // ─── Execução em subprocess ────────────────────────────────────────────────
-
-    private static void rodar(String classeMain, String... extras) {
-        try {
-            String javaExe = ProcessHandle.current().info().command()
-                .orElse(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
-
-            List<String> cmd = new ArrayList<>();
-            cmd.add(javaExe);
-            cmd.add("-cp");
-            cmd.add(OUT_DIR);
-            cmd.add(classeMain);
-            Collections.addAll(cmd, extras);
-
-            new ProcessBuilder(cmd)
-                .directory(Paths.get("").toAbsolutePath().toFile())
-                .inheritIO()
-                .start()
-                .waitFor();
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(null,
-                "Erro ao iniciar: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
-        }
     }
 }
