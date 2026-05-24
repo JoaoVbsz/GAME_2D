@@ -97,7 +97,13 @@ public class Launcher {
                 "IP do servidor:", "Conectar", JOptionPane.PLAIN_MESSAGE, null, null, "");
             if (ip != null && !ip.isBlank()) {
                 frame.dispose();
-                rodarPython(ip.trim());
+                new Thread(() -> {
+                    try {
+                        rodar("bridge.BridgeJogo", ip.trim());
+                    } catch (Exception ex) { ex.printStackTrace(); }
+                }).start();
+                try { Thread.sleep(800); } catch (InterruptedException ignored) {}
+                rodarPython("127.0.0.1");
             }
         });
 

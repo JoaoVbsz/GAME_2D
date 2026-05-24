@@ -1,16 +1,20 @@
 package servidor;
 
-import java.io.*;
-import java.net.*;
+import shared.IClienteCallback;
+import shared.IJogoServidor;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class ServidorJogo {
+public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
     // Constantes do Jogo
     private static final int LARGURA = 736;
     private static final int ALTURA = 414;
-    private static final int PORTA = 5555;
+    private static final int PORTA_RMI = 5555;
     private static final double GRAVIDADE = 1;
     private static final double VEL_PULO = -15;
     private static final double ACEL_J1 = 0.5;
@@ -24,8 +28,8 @@ public class ServidorJogo {
     private static final int TAM_J = 100;
     private static final int TAM_VOA = 80;
 
-    // Estado do Servidor
-    private final List<ClientHandler> clientes = new CopyOnWriteArrayList<>();
+    // RMI e Conexão
+    private final Map<Integer, IClienteCallback> callbacks = new ConcurrentHashMap<>();
     private final ReentrantLock lock = new ReentrantLock();
     private boolean rodando = false;
     private boolean fimJogo = false;
@@ -41,10 +45,10 @@ public class ServidorJogo {
     private int j2tiros;
     private long j2recargaT;
 
-    private final List<double[]> inimigos = new ArrayList<>(); // [x, y, id]
-    private final List<double[]> voadores = new ArrayList<>(); // [x, yBase, y, tick, id]
-    private final List<double[]> projJ1 = new ArrayList<>();   // [x, y, id]
-    private final List<double[]> projJ2 = new ArrayList<>();   // [x, y, id]
+    private final List<double[]> inimigos = new ArrayList<>();
+    private final List<double[]> voadores = new ArrayList<>();
+    private final List<double[]> projJ1 = new ArrayList<>();
+    private final List<double[]> projJ2 = new ArrayList<>();
 
     private int[] pontos = {0, 0};
     private int nid = 0;
@@ -55,7 +59,8 @@ public class ServidorJogo {
 
     private final Random rng = new Random();
 
-    public ServidorJogo() {
+    public ServidorJogo() throws RemoteException {
+        super();
         reset();
     }
 
@@ -72,32 +77,51 @@ public class ServidorJogo {
 
     private int nextId() { return ++nid; }
 
-    public void iniciar() {
-        try (ServerSocket serverSocket = new ServerSocket(PORTA)) {
-            System.out.println("[*] Servidor TCP aguardando na porta " + PORTA);
-
-            while (clientes.size() < 2) {
-                Socket socket = serverSocket.accept();
-                int playerId = clientes.size();
-                ClientHandler handler = new ClientHandler(socket, playerId);
-                clientes.add(handler);
-                new Thread(handler).start();
-                System.out.println("[+] J" + playerId + " conectado de " + socket.getInetAddress());
-                
-                // Enviar confirmação de conexão
-                handler.enviar("{\"tipo\":\"conectado\",\"player_id\":" + playerId + "}");
+    @Override
+    public int conectar(IClienteCallback callback) throws RemoteException {
+        lock.lock();
+        try {
+            int pid = callbacks.size();
+            if (pid >= 2) return -1;
+            callbacks.put(pid, callback);
+            System.out.println("[+] J" + pid + " conectado via RMI callback");
+            
+            if (callbacks.size() == 2 && !rodando) {
+                new Thread(this::gameLoop).start();
             }
+            return pid;
+        } finally {
+            lock.unlock();
+        }
+    }
 
-            System.out.println("[*] Dois jogadores conectados. Iniciando game loop...");
-            gameLoop();
+    @Override
+    public void processarInput(int playerId, List<String> teclas) throws RemoteException {
+        lock.lock();
+        try {
+            Set<String> tSet = new HashSet<>(teclas);
+            if (playerId == 0) teclas0 = tSet;
+            else if (playerId == 1) teclas1 = tSet;
+        } finally {
+            lock.unlock();
+        }
+    }
 
-        } catch (IOException e) {
-            System.err.println("Erro no servidor: " + e.getMessage());
+    @Override
+    public void desconectar(int playerId) throws RemoteException {
+        System.out.println("[-] J" + playerId + " desconectado");
+        callbacks.remove(playerId);
+        lock.lock();
+        try {
+            fimJogo = true;
+        } finally {
+            lock.unlock();
         }
     }
 
     private void gameLoop() {
         rodando = true;
+        System.out.println("[*] Iniciando game loop...");
         long dtMs = 1000 / TICK_RATE;
         while (rodando) {
             long t0 = System.currentTimeMillis();
@@ -111,11 +135,6 @@ public class ServidorJogo {
                 broadcast(estadoJson);
             } finally {
                 lock.unlock();
-            }
-
-            if (fimJogo) {
-                // Pequeno delay antes de talvez fechar ou resetar, 
-                // mas aqui o requisito é apenas tratar desconexão/fim.
             }
 
             long elapsed = System.currentTimeMillis() - t0;
@@ -324,86 +343,27 @@ public class ServidorJogo {
     }
 
     private void broadcast(String mensagem) {
-        for (ClientHandler client : clientes) {
-            client.enviar(mensagem);
-        }
-    }
-
-    private class ClientHandler implements Runnable {
-        private final Socket socket;
-        private final int playerId;
-        private PrintWriter out;
-
-        public ClientHandler(Socket socket, int playerId) {
-            this.socket = socket;
-            this.playerId = playerId;
-        }
-
-        public void enviar(String mensagem) {
-            if (out != null) {
-                out.println(mensagem);
-            }
-        }
-
-        @Override
-        public void run() {
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-                out = new PrintWriter(socket.getOutputStream(), true);
-                
-                String line;
-                while ((line = in.readLine()) != null) {
-                    processarInputJSON(line);
-                }
-            } catch (IOException e) {
-                System.out.println("[-] J" + playerId + " desconectado");
-            } finally {
-                lock.lock();
-                try {
-                    fimJogo = true;
-                    rodando = false;
-                } finally {
-                    lock.unlock();
-                }
-                clientes.remove(this);
-                try { socket.close(); } catch (IOException ignored) {}
-            }
-        }
-
-        private void processarInputJSON(String line) {
-            // Exemplo esperado: {"tipo":"input","player_id":0,"teclas":["RIGHT","K"]}
-            if (line.contains("\"teclas\":[")) {
-                int start = line.indexOf("[") + 1;
-                int end = line.indexOf("]");
-                if (start > 0 && end > start) {
-                    String keysStr = line.substring(start, end).replace("\"", "");
-                    String[] keys = keysStr.isEmpty() ? new String[0] : keysStr.split(",");
-                    
-                    lock.lock();
-                    try {
-                        Set<String> tSet = new HashSet<>();
-                        for (String k : keys) {
-                            String trimmed = k.trim();
-                            if (!trimmed.isEmpty()) tSet.add(trimmed);
-                        }
-                        if (playerId == 0) teclas0 = tSet;
-                        else if (playerId == 1) teclas1 = tSet;
-                    } finally {
-                        lock.unlock();
-                    }
-                } else if (line.contains("\"teclas\":[]")) {
-                    lock.lock();
-                    try {
-                        if (playerId == 0) teclas0 = new HashSet<>();
-                        else if (playerId == 1) teclas1 = new HashSet<>();
-                    } finally {
-                        lock.unlock();
-                    }
-                }
+        for (Integer pid : callbacks.keySet()) {
+            try {
+                callbacks.get(pid).receberJson(mensagem);
+            } catch (RemoteException e) {
+                System.err.println("Erro ao enviar para J" + pid + ", desconectando...");
+                callbacks.remove(pid);
+                fimJogo = true;
             }
         }
     }
 
     public static void main(String[] args) {
-        new ServidorJogo().iniciar();
+        try {
+            System.setProperty("java.rmi.server.hostname", "127.0.0.1");
+            ServidorJogo srv = new ServidorJogo();
+            Registry registry = LocateRegistry.createRegistry(PORTA_RMI);
+            registry.rebind("ServidorJogo", srv);
+            System.out.println("[*] Servidor RMI pronto na porta " + PORTA_RMI);
+        } catch (Exception e) {
+            System.err.println("Erro no Servidor RMI: " + e.toString());
+            e.printStackTrace();
+        }
     }
 }
