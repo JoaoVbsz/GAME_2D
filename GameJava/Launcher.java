@@ -212,7 +212,8 @@ public class Launcher {
                 "Seu IP: " + ip + " | Porta: 5555\nAguardando cliente...",
                 "Servidor", JOptionPane.INFORMATION_MESSAGE);
             liberarPorta(5555);
-            iniciarServidorEmbutido();
+            abrirFirewall();
+            rodar("servidor.ServidorJogo");
             frame.dispose();
         });
 

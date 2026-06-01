@@ -1,5 +1,6 @@
 package servidor;
 
+import shared.Configuracoes;
 import shared.IClienteCallback;
 import shared.IJogoServidor;
 import java.rmi.RemoteException;
@@ -12,9 +13,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
     // Constantes do Jogo
-    private static final int LARGURA = 736;
-    private static final int ALTURA = 414;
-    private static final int PORTA_RMI = 5555;
+    private static final int LARGURA = Configuracoes.LARGURA;
+    private static final int ALTURA = Configuracoes.ALTURA;
+    private static final int PORTA_RMI = Configuracoes.PORTA;
     private static final int PORTA_OBJETO = 5556;
     private static final double GRAVIDADE = 1;
     private static final double VEL_PULO = -15;
@@ -358,17 +359,9 @@ public class ServidorJogo extends UnicastRemoteObject implements IJogoServidor {
         }
     }
 
-    private static String getIpLocal() {
-        try (java.net.DatagramSocket s = new java.net.DatagramSocket()) {
-            s.connect(java.net.InetAddress.getByName("8.8.8.8"), 80);
-            return s.getLocalAddress().getHostAddress();
-        } catch (Exception ignored) {}
-        return "127.0.0.1";
-    }
-
     public static void main(String[] args) {
         try {
-            String ip = getIpLocal();
+            String ip = Configuracoes.getIpLocal();
             System.setProperty("java.rmi.server.hostname", ip);
             ServidorJogo srv = new ServidorJogo();
             Registry registry = LocateRegistry.createRegistry(PORTA_RMI);

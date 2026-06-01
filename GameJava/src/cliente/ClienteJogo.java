@@ -32,7 +32,7 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
     public ClienteJogo(String ip, boolean singlePlayer) throws Exception {
         super(PORTA_CALLBACK);
         this.singlePlayer = singlePlayer;
-        String ipLocal = getIpLocal();
+        String ipLocal = Configuracoes.getIpLocal();
         System.setProperty("java.rmi.server.hostname", ipLocal);
         System.out.println("[*] IP local do cliente: " + ipLocal);
         System.out.println("[*] Conectando ao servidor: " + ip + ":" + Configuracoes.PORTA);
@@ -362,14 +362,6 @@ public class ClienteJogo extends UnicastRemoteObject implements IClienteCallback
             lista.add(new Point(getInt("{" + item + "}", "x"), getInt("{" + item + "}", "y")));
         }
         return lista;
-    }
-
-    private static String getIpLocal() {
-        try (java.net.DatagramSocket s = new java.net.DatagramSocket()) {
-            s.connect(java.net.InetAddress.getByName("8.8.8.8"), 80);
-            return s.getLocalAddress().getHostAddress();
-        } catch (Exception ignored) {}
-        return "127.0.0.1";
     }
 
     public static void main(String[] args) throws Exception {
