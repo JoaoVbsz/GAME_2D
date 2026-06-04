@@ -136,3 +136,10 @@ GameJava/
 | `5555` | RMI Registry |
 | `5556` | Objeto ServidorJogo exportado |
 | `5557` | Callback do cliente |
+
+--- 
+
+**Criadores:**
+- joão Vitor Souza (JoaoVbsz)
+- Paulo Henrique Souza (HenriqueSZ5)
+- Manoel Souza (manoelvsz)
