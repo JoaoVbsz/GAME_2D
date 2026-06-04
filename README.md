@@ -140,6 +140,6 @@ GameJava/
 --- 
 
 **Criadores:**
-- joão Vitor Souza (JoaoVbsz)
+- João Vitor Souza (JoaoVbsz)
 - Paulo Henrique Souza (HenriqueSZ5)
 - Manoel Souza (manoelvsz)
